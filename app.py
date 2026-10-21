@@ -18,7 +18,7 @@ import streamlit as st
 
 # Paste your Google Sheet's link between the quotes.
 # The sheet must be shared as "Anyone with the link - Viewer".
-SHEET_URL = ""
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1NvPFDcsWN_1hq9r1Jjid0A_fVj9_W_2nfufgP5FicTg/edit?gid=1999906647#gid=1999906647"
 
 # Last day of the pay period being reviewed (year-month-day)
 PAY_PERIOD_END = "2026-10-16"
