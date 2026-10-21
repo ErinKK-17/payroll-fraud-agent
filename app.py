@@ -4,7 +4,9 @@
 #  and shows a ranked report of who to investigate first.
 # =====================================================================
 
+import io
 import re
+import urllib.request
 from datetime import datetime
 
 import pandas as pd
@@ -40,7 +42,7 @@ st.set_page_config(page_title="Payroll Fraud Agent", page_icon="🔎", layout="w
 
 def sheet_link_to_csv_link(link):
     """Turn a normal Google Sheet link into a 'download as CSV' link."""
-    match = re.search(r"/spreadsheets/d/([a-zA-Z0-9-_]+)", link)
+    match = re.search(r"/spreadsheets/(?:u/\d+/)?d/([a-zA-Z0-9-_]+)", link)
     if not match:
         return None
     sheet_id = match.group(1)
@@ -51,7 +53,14 @@ def sheet_link_to_csv_link(link):
 
 @st.cache_data(ttl=REFRESH_SECONDS)                    # re-download every REFRESH_SECONDS
 def load_from_sheet(csv_link):
-    return pd.read_csv(csv_link, header=None, dtype=str)
+    # Download the sheet like a normal web browser would
+    request = urllib.request.Request(csv_link, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(request, timeout=20) as response:
+        text = response.read().decode("utf-8-sig")
+    # If Google sent back a web page instead of data, the sheet isn't public
+    if text.lstrip().lower().startswith(("<!doctype", "<html")):
+        raise PermissionError("Google sent back a sign-in page instead of the data, so the sheet isn't public yet.")
+    return pd.read_csv(io.StringIO(text), header=None, dtype=str)
 
 
 def clean_up(raw):
@@ -191,9 +200,11 @@ try:
             st.error("That doesn't look like a Google Sheet link. It should contain /spreadsheets/d/…")
             st.stop()
         raw, source = load_from_sheet(csv_link), "Google Sheet (refreshes automatically)"
-except Exception:
+except Exception as problem:
     st.error("Couldn't read the sheet. Check that it's shared as **Anyone with the link - Viewer**, "
              "and that the payroll tab is the one in the link.")
+    # Show the technical reason so we can figure out what went wrong
+    st.code(f"Details: {type(problem).__name__}: {problem}\nTried: {csv_link if 'csv_link' in dir() else link}")
     st.stop()
 
 if raw is None:
